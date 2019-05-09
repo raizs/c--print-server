@@ -1,11 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Printing;
 using System.IO;
-using RawPrint;
 using System.Net;
 
 namespace ConsoleApp3
@@ -20,18 +14,15 @@ namespace ConsoleApp3
                 listener = new HttpListener();
                 listener.Prefixes.Add("http://localhost:8080/print/");
                 listener.Start();
-                while(true)
+                foreach (string p in System.Drawing.Printing.PrinterSettings.InstalledPrinters)
+                {
+                    Console.WriteLine(p);
+                }
+                while (true)
                 {
                     Console.WriteLine("Waiting...");
-                    foreach (string p in System.Drawing.Printing.PrinterSettings.InstalledPrinters)
-                    {
-                        Console.WriteLine(p);
-                    }
                     var context = listener.GetContext();
-                    string msg = "hello";
-                    //context.Response.ContentLength64 = msg;
                     var method = context.Request.HttpMethod;
-                    Console.WriteLine(method);
                     if (method != "POST")
                     {
                         context.Response.StatusCode = 403;
@@ -48,6 +39,8 @@ namespace ConsoleApp3
                     else
                     {
                         var request = context.Request;
+                        var type = request.QueryString["type"];
+
                         if (!request.HasEntityBody)
                         {
                             Console.WriteLine("No client data was sent with the request.");
@@ -56,42 +49,43 @@ namespace ConsoleApp3
                         Console.WriteLine("Before");
                         try
                         {
-                            System.IO.Stream body = request.InputStream;
-                            //string s = reader.ReadToEnd();
-                            var fileStream = File.OpenWrite("TempFile.pdf");
-
-                            //request.InputStream.Seek(0, SeekOrigin.Begin);
-                            body.CopyTo(fileStream);
-                            fileStream.Close();
-                            body.Close();
+                            using (System.IO.FileStream output = new System.IO.FileStream(@"C:\Users\arthu\source\repos\ConsoleApp3\ConsoleApp3\bin\Debug\TempFile.pdf", FileMode.Create))
+                            {
+                                request.InputStream.CopyTo(output);
+                            }
                         }
                         finally
                         {
                             string filePath = @"C:\Users\arthu\source\repos\ConsoleApp3\ConsoleApp3\bin\Debug\TempFile.pdf";
-                            string filename = "pdf-sample.pdf";
-                            string printerName = "Brother HL-L5102DW Printer";
+                            string printerName = "";
+                            if (type == "paper")
+                            {
+                                printerName = " \"Brother HL-L5102DW Printer\"";
+                            } 
+                            else if(type == "label")
+                            {
+                                printerName = " \"Brother QL-810W\"";
+                            }
                             Console.WriteLine("Sending to printer...");
-                            IPrinter printer = new Printer();
-                            printer.PrintRawFile(printerName, filePath, filename);
+                            System.Diagnostics.Process.Start("PDFtoPrinter.exe", filePath + printerName);
 
                             context.Response.StatusCode = (int)HttpStatusCode.OK;
-                            using(Stream stream = context.Response.OutputStream)
+                            using (Stream stream = context.Response.OutputStream)
                             {
                                 using (StreamWriter writer = new StreamWriter(stream))
                                 {
-                                    writer.Write(msg);
+                                    writer.Write("Success");
                                 }
                             }
                         }
                     }
                 }
             }
-            catch(WebException e)
+            catch (WebException e)
             {
                 Console.WriteLine(e.Status);
             }
-            //
-            //System.Threading.Thread.Sleep(10000);
         }
+
     }
 }
